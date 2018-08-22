@@ -83,6 +83,18 @@ def iter_discrete_traces(graph_type, fn, *args, **kwargs):
         yield traced_fn.get_trace(*args, **kwargs)
 
 
+def _is_enumerated(site):
+    return not site['infer'].get('_enumerated')
+
+
+def marginalize_discrete(fn):
+    trace_messenger = TraceMessenger()
+    fn = trace_messenger(fn)
+    fn = poutine.marginalize(fn)
+    fn = poutine.block(fn, hide_fn=_is_enumerated)
+    return fn
+
+
 def _config_enumerate(default, expand, num_samples):
 
     def config_fn(site):
