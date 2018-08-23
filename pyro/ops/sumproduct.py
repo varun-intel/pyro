@@ -9,6 +9,7 @@ from six.moves import reduce
 
 from pyro.distributions.util import broadcast_shape
 from pyro.ops.einsum import contract
+from pyro.ops.einsum.logsumexp import Factor
 
 
 def zip_align_right(xs, ys):
@@ -75,10 +76,13 @@ def logsumproductexp(log_factors, target_shape=(), optimize=True):
         tensor_part = logsumproductexp(tensors, target_shape)
         return tensor_part + number_part
     if optimize:
-        return opt_sumproduct(tensors, target_shape,
-                              backend='pyro.ops.einsum.torch_log')
+        factors = [Factor.from_tensor(t) for t in tensors]
+        result = opt_sumproduct(factors, target_shape, backend='pyro.ops.einsum.logsumexp')
+        return result.to_tensor()
     else:
-        return naive_sumproduct([t.exp() for t in tensors], target_shape).log()
+        factors = [t.exp() for t in tensors]
+        result = naive_sumproduct(factors, target_shape)
+        return result.log()
 
 
 def naive_sumproduct(factors, target_shape):

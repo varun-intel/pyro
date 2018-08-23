@@ -1,29 +1,51 @@
 from __future__ import absolute_import, division, print_function
 
 import torch
+from collections import namedtuple
 
 from opt_einsum.parser import einsum_symbols_base
 
 
+class Factor(namedtuple('Factor', ['value', 'shift'])):
+    @property
+    def shape(self):
+        return self.value.shape
+
+    def ndimension(self):
+        return self.value.ndimension()
+
+    @staticmethod
+    def from_tensor(tensor):
+        value = tensor.new_zeros(torch.Size()).expand((1,) * len(tensor.shape))
+        shift = tensor
+        return Factor(value, shift)
+
+    def to_tensor(self):
+        return self.value.log() + self.log_scale
+
+
 def transpose(a, axes):
-    return a.permute(*axes)
+    value = a.value.permute(*axes)
+    log_scale = a.log_scale.permute(*axes)
+    return Factor(value, log_scale)
 
 
 def einsum(equation, *operands):
     """
     Log-sum-exp implementation of einsum.
     """
+    assert all(isinstance(f, Factor) for f in operands)
     inputs, output = equation.split('->')
     inputs = inputs.split(',')
 
     shifts = []
-    exp_operands = []
+    values = []
     for dims, operand in zip(inputs, operands):
-        shift = operand
+        value, shift = operand
         for i, dim in enumerate(dims):
             if dim not in output:
                 shift = shift.max(i, keepdim=True)[0]
-        exp_operands.append((operand - shift).exp())
+        values.append(value / shift.exp())
 
         # permute shift to match output
         shift = shift.squeeze()  # FIXME fails for dims of size 1
@@ -34,14 +56,16 @@ def einsum(equation, *operands):
             shift = shift.permute(*(dims.index(dim) for dim in output))
         shifts.append(shift)
 
-    result = torch.einsum(equation, exp_operands).log()
-    return sum(shifts + [result])
+    value = torch.einsum(equation, values)
+    return Factor(value, sum(shifts))
 
 
 # Copyright (c) 2014 Daniel Smith
 # This function is copied and adapted from:
 # https://github.com/dgasmith/opt_einsum/blob/a6dd686/opt_einsum/backends/torch.py
 def tensordot(x, y, axes=2):
+    assert isinstance(x, Factor)
+    assert isinstance(y, Factor)
     xnd = x.ndimension()
     ynd = y.ndimension()
 
