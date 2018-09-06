@@ -7,6 +7,10 @@ import torch
 
 import pyro
 
+# Avoid benign scipy-numpy version warnings following
+# https://stackoverflow.com/questions/40845304
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
 torch.set_default_tensor_type(os.environ.get('PYRO_TENSOR_TYPE', 'torch.DoubleTensor'))
 

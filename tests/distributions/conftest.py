@@ -1,16 +1,24 @@
 from __future__ import absolute_import, division, print_function
 
 import math
+import warnings
 
 import numpy as np
 import pytest
-import scipy.stats as sp
 
 import pyro.distributions as dist
 from pyro.distributions.testing.naive_dirichlet import NaiveBeta, NaiveDirichlet
 from pyro.distributions.testing.rejection_exponential import RejectionExponential
 from pyro.distributions.testing.rejection_gamma import ShapeAugmentedBeta, ShapeAugmentedDirichlet, ShapeAugmentedGamma
 from tests.distributions.dist_fixture import Fixture
+
+# Avoid benign scipy-numpy version warnings following
+# https://stackoverflow.com/questions/40845304
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
+import scipy.stats as sp  # noqa isort:skip
+
 
 continuous_dists = [
     Fixture(pyro_dist=dist.Uniform,
